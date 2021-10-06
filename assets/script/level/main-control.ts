@@ -21,20 +21,23 @@ export default class MainControl extends cc.Component {
   @property(AudioControl)
   audioControl: AudioControl = null;
 
-  menuGame: MenuGame = null;
-  enemies: cc.Node = null;
+  @property(cc.Node)
   winGame: cc.Node = null;
 
+  menuGame: MenuGame = null;
+  enemies: cc.Node = null;
   lbTitle: cc.Label = null;
   spGameOver: cc.Sprite = null;
   startBtn: cc.Button = null;
   backBtn: cc.Button = null;
   progressBar: cc.Sprite = null;
-
   pipe: cc.Node[] = [null, null, null];
-  minY: number = -120;
-  maxY: number = 120;
+  minY: number = -100;
+  maxY: number = 100;
   gameScore: number = 0;
+  activeTimer: number = 0;
+  restOfPipesToMoveUpDown: number = 0;
+  movePipesUpDownContinue: boolean = false;
 
   //set GameStatus
   gameStatus: GameStatus = GameStatus.GameStart;
@@ -43,6 +46,12 @@ export default class MainControl extends cc.Component {
     //open Collision System
     var collisionManager = cc.director.getCollisionManager();
     collisionManager.enabled = true;
+
+    //disable explosionParticle
+    this.node
+      .getChildByName("Bird")
+      .getChildByName("Explosion")
+      .getChildByName("Explosion_Particle").active = false;
 
     //find Title label
     this.lbTitle = this.node.getChildByName("Title").getComponent(cc.Label);
@@ -77,14 +86,11 @@ export default class MainControl extends cc.Component {
       .getComponent(cc.Sprite);
     this.progressBar.node.active = false;
 
-    //find winGame node and disabled
-    this.winGame = this.node.getChildByName("WinGame");
-    this.winGame.active = false;
-
     this.menuGame = cc.Canvas.instance.getComponent("menu-game");
   }
 
   start() {
+    this.setBackground();
     this.createPipes();
   }
 
@@ -112,7 +118,8 @@ export default class MainControl extends cc.Component {
 
   moveBackground() {
     for (let i = 0; i < this.spBg.length; i++) {
-      this.spBg[i].node.x -= 1.0;
+      this.spBg[i].node.x -=
+        this.menuGame.levels[this.menuGame.currentLevel].moveSpeed;
       if (this.spBg[i].node.x <= -288) {
         this.spBg[i].node.x = 288;
       }
@@ -121,16 +128,77 @@ export default class MainControl extends cc.Component {
 
   movePipes() {
     for (let i = 0; i < this.pipe.length; i++) {
-      this.pipe[i].x -= 1.0;
+      this.pipe[i].x -=
+        this.menuGame.levels[this.menuGame.currentLevel].moveSpeed;
 
       if (this.pipe[i].x <= -170) {
         this.pipe[i].x = 430;
         this.pipe[i].y = this.minY + Math.random() * (this.maxY - this.minY);
+
+        if (this.restOfPipesToMoveUpDown > 0) {
+          this.movePipeUpDown(i);
+          this.restOfPipesToMoveUpDown--;
+        }
       }
     }
   }
 
+  resetPositionUpPipeDownPipe() {
+    for (let i = 0; i < this.pipe.length; i++) {
+      this.pipe[i].getChildByName("Up").y = -240;
+      this.pipe[i].getChildByName("Down").y = 240;
+    }
+  }
+
+  movePipeUpDown(index: number) {
+    const moveUpDown = ["Up", "Down"];
+    const randomIndex = Math.floor(Math.random() * moveUpDown.length);
+    const yAxis = this.pipe[index].getChildByName(moveUpDown[randomIndex]).y;
+    const yMoveUp = moveUpDown[randomIndex] == "Up" ? yAxis + 20 : yAxis - 20;
+    const yMoveDown = moveUpDown[randomIndex] == "Up" ? yAxis - 20 : yAxis + 20;
+
+    cc.tween(this.pipe[index].getChildByName(moveUpDown[randomIndex]))
+      .repeat(
+        5 + index,
+        cc
+          .tween()
+          .to(1, {
+            position: new cc.Vec3(
+              this.pipe[index].getChildByName(moveUpDown[randomIndex]).x,
+              yMoveUp
+            ),
+          })
+          .to(1, {
+            position: new cc.Vec3(
+              this.pipe[index].getChildByName(moveUpDown[randomIndex]).x,
+              yMoveDown
+            ),
+          })
+      )
+      .call(() => {
+        this.pipe[index].getChildByName("Up").y = -240;
+        this.pipe[index].getChildByName("Down").y = 240;
+      })
+      .start();
+  }
+
   gameOver() {
+    //explosion when bird died
+    const explosionParticle = this.node
+      .getChildByName("Bird")
+      .getChildByName("Explosion")
+      .getChildByName("Explosion_Particle");
+    explosionParticle.active = true;
+
+    this.activeTimer = setTimeout(() => {
+      console.log("activeTimer");
+      explosionParticle.active = false;
+      this.node.getChildByName("Bird").active = false;
+    }, 600);
+
+    cc.Tween.stopAll();
+    this.resetPositionUpPipeDownPipe();
+
     this.spGameOver.node.active = true;
 
     //when game over, show start button
@@ -148,17 +216,29 @@ export default class MainControl extends cc.Component {
 
   completeLevel() {
     //save the completed level
-    cc.sys.localStorage.setItem("levelComplete", this.menuGame.currentLevel);
+    const completedLevel = +cc.sys.localStorage.getItem("levelComplete");
+    if (completedLevel <= this.menuGame.currentLevel) {
+      cc.sys.localStorage.setItem("levelComplete", this.menuGame.currentLevel);
+    }
 
-    //display WinGame node
+    //active WinGame node
     this.winGame.active = true;
 
+    //firework when complete level
+    this.winGame
+      .getChildByName("Congratulation")
+      .getComponent(cc.Animation)
+      .play();
+
     //if it's last level, disable Nextlevel button
-    if (this.menuGame.currentLevel >= this.menuGame.levelGame.length - 1) {
+    if (this.menuGame.currentLevel >= this.menuGame.levels.length - 1) {
       this.winGame
         .getChildByName("NextLevelBtn")
         .getComponent(cc.Button).node.active = false;
     }
+
+    cc.Tween.stopAll();
+    this.resetPositionUpPipeDownPipe();
 
     //set status to game complete
     this.gameStatus = GameStatus.GameComplete;
@@ -174,6 +254,16 @@ export default class MainControl extends cc.Component {
     //hide back button
     this.backBtn.node.active = false;
 
+    //clear activeTimer & hide explosion particle
+    clearTimeout(this.activeTimer);
+    this.node
+      .getChildByName("Bird")
+      .getChildByName("Explosion")
+      .getChildByName("Explosion_Particle").active = false;
+
+    //find bird & active
+    this.node.getChildByName("Bird").active = true;
+
     //show progress bar
     this.progressBar.node.active = true;
 
@@ -186,18 +276,39 @@ export default class MainControl extends cc.Component {
     //hide gameOver node
     this.spGameOver.node.active = false;
 
-    //reset pipes
+    this.resetPipes();
+    this.resetAngleAndPositionOfBird();
+
+    this.gameScore = 0;
+
+    // move pipes up down for the first time
+    this.movePipesUpDownContinue = false;
+    const numberOfPipesToMoveUpDown =
+      +this.menuGame.levels[this.menuGame.currentLevel]
+        .numberOfPipesToMoveUpDown;
+    if (numberOfPipesToMoveUpDown > 0) {
+      const rangeOfMove = Math.min(numberOfPipesToMoveUpDown, this.pipe.length);
+      for (let i = 0; i < rangeOfMove; i++) {
+        this.movePipeUpDown(i);
+      }
+      this.restOfPipesToMoveUpDown =
+        numberOfPipesToMoveUpDown > this.pipe.length
+          ? numberOfPipesToMoveUpDown - this.pipe.length
+          : 0;
+    }
+  }
+
+  resetPipes() {
     for (let i = 0; i < this.pipe.length; i++) {
       this.pipe[i].x = 170 + 200 * i;
       this.pipe[i].y = this.minY + Math.random() * (this.maxY - this.minY);
     }
+  }
 
-    //reset angle & position of bird
+  resetAngleAndPositionOfBird() {
     const bird = this.node.getChildByName("Bird");
     bird.y = 0;
     bird.angle = 0;
-
-    this.gameScore = 0;
   }
 
   onTouchBackBtn() {
@@ -213,7 +324,7 @@ export default class MainControl extends cc.Component {
 
     //remove previous level node
     let childNode =
-      this.menuGame.levelGame[this.menuGame.currentLevel].levelGamePrefab;
+      this.menuGame.levels[this.menuGame.currentLevel].levelsPrefab;
     if (childNode) {
       this.node.removeChild(this.node.getChildByName(childNode.name));
     }
@@ -223,11 +334,13 @@ export default class MainControl extends cc.Component {
 
     //add next level node
     const nextLevelPb =
-      this.menuGame.levelGame[this.menuGame.currentLevel].levelGamePrefab;
+      this.menuGame.levels[this.menuGame.currentLevel].levelsPrefab;
     if (nextLevelPb) {
       const nextLevelGame = cc.instantiate(nextLevelPb);
       this.node.addChild(nextLevelGame);
     }
+
+    this.setBackground();
 
     //show title label
     this.lbTitle.node.active = true;
@@ -237,5 +350,25 @@ export default class MainControl extends cc.Component {
 
     //show back button
     this.backBtn.node.active = true;
+
+    this.resetPipes();
+    this.resetAngleAndPositionOfBird();
+
+    this.gameScore = 0;
+    this.progressBar.getComponent(cc.ProgressBar).progress = this.gameScore;
+
+    //hide progress bar
+    this.progressBar.node.active = false;
+  }
+
+  setBackground() {
+    if (this.menuGame.levels[this.menuGame.currentLevel].spfBg) {
+      for (let i = 0; i < this.spBg.length; i++) {
+        this.spBg[i].spriteFrame =
+          this.menuGame.levels[this.menuGame.currentLevel].spfBg;
+        this.spBg[i].node.width = 288;
+        this.spBg[i].node.height = 512;
+      }
+    }
   }
 }

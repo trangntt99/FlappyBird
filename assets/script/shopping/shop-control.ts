@@ -2,14 +2,25 @@ const { ccclass, property } = cc._decorator;
 
 @ccclass
 export default class ShopControl extends cc.Component {
-  listItem: cc.Sprite[] = [null, null, null, null, null, null, null];
-  currentIndex: number = -1;
+  listItem: cc.Sprite[] = [];
+  traces: number[] = [];
 
   onLoad() {
     this.listItem = this.node
       .getChildByName("view")
       ?.getChildByName("content")
       ?.getComponentsInChildren(cc.Sprite);
+
+    for (let i = 0; i < this.listItem.length; i++) {
+      this.traces[i] = 0;
+    }
+
+    const indexItemString = cc.sys.localStorage.getItem("item");
+    if (indexItemString) {
+      const indexItem = indexItemString >> 0;
+      this.traces[indexItem] = 1;
+      cc.tween(this.listItem[indexItem].node).to(1, { scale: 1.5 }).start();
+    }
   }
 
   start() {
@@ -29,15 +40,21 @@ export default class ShopControl extends cc.Component {
   }
 
   handleEvenButton(index: number) {
-    cc.tween(this.listItem[index].node).to(1, { scale: 1.5 }).start();
-
-    if (this.currentIndex != -1) {
-      cc.tween(this.listItem[this.currentIndex].node)
-        .to(1, { scale: 1 })
-        .start();
+    if (this.traces[index] == 0) {
+      cc.sys.localStorage.setItem("item", index);
+      cc.tween(this.listItem[index].node).to(1, { scale: 1.5 }).start();
+      for (let i = 0; i < this.traces.length; i++) {
+        if (this.traces[i] == 1) {
+          this.traces[i] == 0;
+          cc.tween(this.listItem[i].node).to(1, { scale: 1 }).start();
+        }
+      }
+      this.traces[index] = 1;
+    } else {
+      this.traces[index] = 0;
+      cc.tween(this.listItem[index].node).to(1, { scale: 1 }).start();
+      cc.sys.localStorage.removeItem("item");
     }
-
-    this.currentIndex = index;
   }
 
   HandleBackBtn() {

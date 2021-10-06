@@ -1,0 +1,55 @@
+{
+  "__type__": "cc.AnimationClip",
+  "_name": "BirdYellowAnim",
+  "_objFlags": 0,
+  "_native": "",
+  "_duration": 0.85,
+  "sample": 60,
+  "speed": 1,
+  "wrapMode": 2,
+  "curveData": {
+    "comps": {
+      "cc.Sprite": {
+        "spriteFrame": [
+          {
+            "frame": 0,
+            "value": {
+              "__uuid__": "4436c9b8-a810-4068-9376-ad0b0e9e6849"
+            }
+          },
+          {
+            "frame": 0.16666666666666666,
+            "value": {
+              "__uuid__": "9d777e78-82e1-4e54-a01d-28abe9292b00"
+            }
+          },
+          {
+            "frame": 0.3333333333333333,
+            "value": {
+              "__uuid__": "fad7d910-8114-4a15-b73e-ed1be8108a92"
+            }
+          },
+          {
+            "frame": 0.5,
+            "value": {
+              "__uuid__": "8476a37d-09ce-4ef5-88a9-bacd36cc6408"
+            }
+          },
+          {
+            "frame": 0.6666666666666666,
+            "value": {
+              "__uuid__": "bce107cf-13a9-4f5a-b422-46d11ea240db"
+            }
+          },
+          {
+            "frame": 0.8333333333333334,
+            "value": {
+              "__uuid__": "840e33c1-e378-41d4-816a-8318b8f37ebd"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "events": []
+}

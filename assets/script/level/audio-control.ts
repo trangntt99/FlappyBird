@@ -16,9 +16,11 @@ export default class AudioControl extends cc.Component {
 
   start() {
     cc.audioEngine.playMusic(this.audioBg, true);
+    cc.audioEngine.setMusicVolume(0.25);
   }
 
   playAudio(type: SoundType) {
     cc.audioEngine.playEffect(this.typeAudio[type], false);
+    cc.audioEngine.setEffectsVolume(0.5);
   }
 }

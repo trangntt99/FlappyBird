@@ -37,5 +37,6 @@
     "audience": {
       "enable": false
     }
-  }
+  },
+  "start-scene": "bd26a8ed-6fd1-436d-8d99-e58f552a1c1a"
 }

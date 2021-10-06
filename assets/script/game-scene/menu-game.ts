@@ -4,10 +4,13 @@ const { ccclass, property } = cc._decorator;
 @ccclass
 export default class MenuGame extends cc.Component {
   @property(cc.Prefab)
+  nodeParentPb: cc.Prefab = null;
+
+  @property(cc.Prefab)
   levelBtnPrefab: cc.Prefab = null;
 
   @property(LevelGame)
-  levelGame: LevelGame[] = [null, null, null];
+  levels: LevelGame[] = [];
 
   @property(cc.Sprite)
   backGround: cc.Sprite = null;
@@ -18,8 +21,20 @@ export default class MenuGame extends cc.Component {
   @property(cc.Label)
   title: cc.Label = null;
 
-  level: cc.Node[] = [null, null, null];
+  @property(cc.Button)
+  nextBtn: cc.Button = null;
+
+  @property(cc.Button)
+  previousBtn: cc.Button = null;
+
+  level: cc.Node[] = [];
   currentLevel: number = -1;
+  recordsPerPage: number = 3;
+  currentPage: number = 1;
+
+  onLoad() {
+    this.previousBtn.node.active = false;
+  }
 
   start() {
     this.createLevelBtn();
@@ -35,27 +50,84 @@ export default class MenuGame extends cc.Component {
     const completedLevelString = cc.sys.localStorage.getItem("levelComplete");
     if (completedLevelString) {
       const completedLevel = completedLevelString >> 0;
-      const levelUnlock = Math.min(completedLevel + 1, this.levelGame.length);
-      for (let i = 1; i <= levelUnlock; i++) {
+      const levelUnlock = Math.min(completedLevel + 1, this.levels.length);
+      for (let i = 0; i <= levelUnlock; i++) {
         this.unlockLevelBtn(this.level[i]);
       }
     }
   }
 
   createLevelBtn() {
-    for (let i = 0; i < this.level.length; i++) {
+    if (this.levels.length <= this.recordsPerPage) {
+      this.nextBtn.node.active = false;
+    }
+
+    const firstIndex = (this.currentPage - 1) * this.recordsPerPage;
+    const records = Math.min(
+      this.currentPage * this.recordsPerPage,
+      this.levels.length
+    );
+    let count = 0;
+
+    for (let i = firstIndex; i < records; i++) {
       const levelBtn = cc.instantiate(this.levelBtnPrefab);
       const nodeParent = this.node.getChildByName("SelectLevel") || this.node;
 
       levelBtn.getComponentInChildren(cc.Label).string = `Level ${i + 1}`;
-      levelBtn.position = new cc.Vec3(0, 32 - 80 * i);
+
+      //align yAxis
+      levelBtn.position = new cc.Vec3(0, 32 - 80 * count++);
+      if (count >= 3) {
+        count = 0;
+      }
+
       levelBtn.getChildByName("CheckComplete").active =
         this.checkCompleteLevel(i);
       levelBtn.getComponent(cc.Button).enabled = false;
-      this.level[i] = levelBtn;
 
+      this.level[i] = levelBtn;
       this.eventButton(this.level[i], i);
       nodeParent.addChild(this.level[i]);
+    }
+  }
+
+  hideLevelButton() {
+    const firstIndex = (this.currentPage - 1) * this.recordsPerPage;
+    for (let i = firstIndex; i < this.currentPage * this.recordsPerPage; i++) {
+      if (this.level[i]) {
+        this.level[i].active = false;
+      }
+    }
+  }
+
+  calculateNumberOfPages() {
+    return Math.ceil(this.levels.length / this.recordsPerPage);
+  }
+
+  previousPage() {
+    console.log("page: " + this.currentPage);
+    if (this.currentPage > 1) {
+      this.hideLevelButton();
+      this.currentPage--;
+      this.createLevelBtn();
+      this.nextBtn.node.active = true;
+
+      if (this.currentPage <= 1) {
+        this.previousBtn.node.active = false;
+      }
+    }
+  }
+
+  nextPage() {
+    if (this.currentPage < this.calculateNumberOfPages()) {
+      this.hideLevelButton();
+      this.currentPage++;
+      this.createLevelBtn();
+      this.previousBtn.node.active = true;
+
+      if (this.currentPage >= this.calculateNumberOfPages()) {
+        this.nextBtn.node.active = false;
+      }
     }
   }
 
@@ -87,16 +159,16 @@ export default class MenuGame extends cc.Component {
 
     this.currentLevel = +customEventData;
 
-    const levelGame = cc.instantiate(this.levelGame[0].levelGamePrefab);
+    const levels = cc.instantiate(this.nodeParentPb);
 
     //add Prefab corresponding to current level
-    const levelGamePb = this.levelGame[this.currentLevel].levelGamePrefab;
-    if (levelGamePb && this.currentLevel > 0) {
-      const nextLevel = cc.instantiate(levelGamePb);
-      levelGame.addChild(nextLevel);
+    const levelsPb = this.levels[this.currentLevel].levelsPrefab;
+    if (levelsPb) {
+      const nextLevel = cc.instantiate(levelsPb);
+      levels.addChild(nextLevel);
     }
 
-    cc.Canvas.instance.node.addChild(levelGame);
+    cc.Canvas.instance.node.addChild(levels);
   }
 
   backToMenu() {
